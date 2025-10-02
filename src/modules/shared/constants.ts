@@ -6,10 +6,10 @@ export const projectStatusValues = [
 ] as const;
 
 export const invoiceStatusValues = [
-  "DRAFT",
-  "SENT",
-  "PAID",
-  "CANCELLED",
+  "OFFERTE",
+  "FACTUUR",
+  "BETAALD",
+  "OVER_DATUM",
 ] as const;
 
 export const invoiceTypeValues = ["QUOTE", "INVOICE"] as const;

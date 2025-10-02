@@ -2,9 +2,19 @@ import { z } from "zod";
 import {
   currencyValues,
   invoiceDocumentStatusValues,
-  invoiceStatusValues,
   invoiceTypeValues,
 } from "@/modules/shared/constants";
+
+/**
+ * Statuswaarden in het Nederlands conform jouw wens.
+ * NB: We gebruiken exact "over datum" met spatie, omdat je dat zo benoemde.
+ */
+export const invoiceStatusValues = [
+  "offerte",
+  "gefactureerd",
+  "betaald",
+  "over datum",
+] as const;
 
 const jsonRecordSchema = z.record(z.string(), z.any());
 
@@ -29,30 +39,35 @@ export const paymentLogSchema = z.object({
   createdAt: z.date(),
 });
 
-export const invoiceSchema = z.object({
-  id: z.string().uuid(),
-  number: z.string().min(1),
-  customerId: z.string().uuid(),
-  projectId: z.string().uuid().nullable().optional(),
-  issueDate: z.coerce.date(),
-  dueDate: z.coerce.date().nullable().optional(),
-  status: z.enum(invoiceStatusValues),
-  type: z.enum(invoiceTypeValues),
-  currency: z.enum(currencyValues),
-  totalAmount: z.coerce.number().nonnegative(),
-  notes: z.string().optional(),
-  lineItems: z.array(invoiceLineItemSchema).default([]),
-  documentStatus: z.enum(invoiceDocumentStatusValues),
-  documentVersion: z.coerce.number().int().positive(),
-  documentUrl: z.string().min(1).optional(),
-  documentGeneratedAt: z.coerce.date().nullable().optional(),
-  documentMeta: jsonRecordSchema.optional(),
-  integrationState: jsonRecordSchema.optional(),
-  externalReference: z.string().optional(),
-  paymentLogs: z.array(paymentLogSchema).default([]),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-});
+export const invoiceSchema = z
+  .object({
+    id: z.string().uuid(),
+    number: z.string().min(1),
+    customerId: z.string().uuid(),
+    /**
+     * Facturen moeten op basis van projecten worden gemaakt,
+     * dus projectId is VERPLICHT.
+     */
+    projectId: z.string().uuid(),
+    issueDate: z.coerce.date(),
+    dueDate: z.coerce.date().nullable().optional(),
+    status: z.enum(invoiceStatusValues),
+    type: z.enum(invoiceTypeValues),
+    currency: z.enum(currencyValues),
+    totalAmount: z.coerce.number().nonnegative(),
+    notes: z.string().optional(),
+    lineItems: z.array(invoiceLineItemSchema).default([]),
+    documentStatus: z.enum(invoiceDocumentStatusValues),
+    documentVersion: z.coerce.number().int().positive(),
+    documentUrl: z.string().min(1).optional(),
+    documentGeneratedAt: z.coerce.date().nullable().optional(),
+    documentMeta: jsonRecordSchema.optional(),
+    integrationState: jsonRecordSchema.optional(),
+    externalReference: z.string().optional(),
+    paymentLogs: z.array(paymentLogSchema).default([]),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+  });
 
 export const createInvoiceSchema = invoiceSchema
   .omit({
@@ -63,7 +78,10 @@ export const createInvoiceSchema = invoiceSchema
   })
   .extend({
     issueDate: z.coerce.date().default(() => new Date()),
-    status: z.enum(invoiceStatusValues).default("DRAFT"),
+    /**
+     * Nieuwe records starten als "offerte".
+     */
+    status: z.enum(invoiceStatusValues).default("offerte"),
     type: z.enum(invoiceTypeValues).default("QUOTE"),
     currency: z.enum(currencyValues).default("EUR"),
     totalAmount: z.coerce.number().nonnegative().optional(),
