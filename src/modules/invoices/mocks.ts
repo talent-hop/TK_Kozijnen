@@ -1,4 +1,4 @@
-﻿export const mockInvoices = [
+export const mockInvoices = [
   {
     id: "2b4c5a4e-0a4f-4d9a-8b72-3a3f0a4b9c10",
     number: "INV-2025-001",
