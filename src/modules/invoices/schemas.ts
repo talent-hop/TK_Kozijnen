@@ -1,109 +1,65 @@
 import { z } from "zod";
-import {
-  currencyValues,
-  invoiceDocumentStatusValues,
-  invoiceTypeValues,
-} from "@/modules/shared/constants";
 
 /**
- * Nederlandse statuswaarden conform gewenste workflow.
- * - "offerte": concept/offertefase
- * - "gefactureerd": verzonden/uitstaande factuur
- * - "betaald": voldaan
- * - "over datum": vervallen (dueDate in verleden en niet betaald)
- *
- * Let op: "over datum" wordt in de flow/logic automatisch afgeleid
- * o.b.v. dueDate en huidige datum, behalve wanneer status "betaald" is.
+ * Line item schema and inferred type
+ * - total is optional; if omitted, your service computes it as quantity * unitPrice
  */
-export const invoiceStatusValues = [
-  "offerte",
-  "gefactureerd",
-  "betaald",
-  "over datum",
-] as const;
-
-const jsonRecordSchema = z.record(z.string(), z.any());
-
 export const invoiceLineItemSchema = z.object({
-  label: z.string().min(1),
-  description: z.string().optional(),
-  quantity: z.coerce.number().int().positive(),
-  unitPrice: z.coerce.number().nonnegative(),
-  total: z.coerce.number().nonnegative().optional(),
+  description: z.string().min(1),
+  quantity: z.number().finite().nonnegative(),
+  unitPrice: z.number().finite().nonnegative(),
+  total: z.number().finite().nonnegative().optional(),
 });
 
-export const paymentLogSchema = z.object({
-  id: z.string().uuid(),
-  invoiceId: z.string().uuid(),
+export type InvoiceLineItem = z.infer<typeof invoiceLineItemSchema>;
+
+/**
+ * Create Invoice schema
+ * - Marked .passthrough() so additional fields (e.g., customerId, projectId, status)
+ *   flow through to Prisma without being stripped.
+ */
+export const createInvoiceSchema = z
+  .object({
+    number: z.string().min(1),
+    currency: z.string().min(1),
+    // Often present, but optional here to stay flexible with your DB layer:
+    customerId: z.string().min(1).optional(),
+    projectId: z.string().min(1).nullable().optional(),
+    issueDate: z.coerce.date().optional(),
+    dueDate: z.coerce.date().nullable().optional(),
+
+    totalAmount: z.number().finite().nonnegative().optional(),
+    lineItems: z.array(invoiceLineItemSchema).optional(),
+  })
+  .passthrough();
+
+/**
+ * Update Invoice schema
+ * - Keep flexible with .passthrough() to allow other updatable fields.
+ * - documentStatus kept as string to avoid coupling to Prisma enums here.
+ */
+export const updateInvoiceSchema = z
+  .object({
+    lineItems: z.array(invoiceLineItemSchema).optional(),
+    totalAmount: z.number().finite().nonnegative().optional(),
+    documentStatus: z.string().optional(),
+    documentGeneratedAt: z.coerce.date().optional(),
+  })
+  .passthrough();
+
+/**
+ * Create Payment Log schema
+ * - Matches fields used in appendPaymentLog() in service.ts
+ */
+export const createPaymentLogSchema = z.object({
   provider: z.string().min(1),
   status: z.string().min(1),
-  amount: z.coerce.number().nonnegative(),
-  currency: z.enum(currencyValues),
-  reference: z.string().optional(),
-  metadata: jsonRecordSchema.optional(),
-  processedAt: z.coerce.date().nullable().optional(),
-  createdAt: z.date(),
+  amount: z.number().finite().nonnegative(),
+  currency: z.string().min(1),
+
+  reference: z.string().optional().nullable(),
+  metadata: z.record(z.any()).optional().nullable(),
+  processedAt: z.coerce.date().optional(),
 });
 
-export const invoiceSchema = z.object({
-  id: z.string().uuid(),
-  number: z.string().min(1),
-  customerId: z.string().uuid(),
-  /**
-   * Facturen worden op basis van projecten gemaakt => verplicht.
-   */
-  projectId: z.string().uuid(),
-  issueDate: z.coerce.date(),
-  dueDate: z.coerce.date().nullable().optional(),
-  status: z.enum(invoiceStatusValues),
-  type: z.enum(invoiceTypeValues),
-  currency: z.enum(currencyValues),
-  totalAmount: z.coerce.number().nonnegative(),
-  notes: z.string().optional(),
-  lineItems: z.array(invoiceLineItemSchema).default([]),
-  documentStatus: z.enum(invoiceDocumentStatusValues),
-  documentVersion: z.coerce.number().int().positive(),
-  documentUrl: z.string().min(1).optional(),
-  documentGeneratedAt: z.coerce.date().nullable().optional(),
-  documentMeta: jsonRecordSchema.optional(),
-  integrationState: jsonRecordSchema.optional(),
-  externalReference: z.string().optional(),
-  paymentLogs: z.array(paymentLogSchema).default([]),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-});
-
-export const createInvoiceSchema = invoiceSchema
-  .omit({
-    id: true,
-    paymentLogs: true,
-    createdAt: true,
-    updatedAt: true,
-  })
-  .extend({
-    issueDate: z.coerce.date().default(() => new Date()),
-    status: z.enum(invoiceStatusValues).default("offerte"),
-    type: z.enum(invoiceTypeValues).default("QUOTE"),
-    currency: z.enum(currencyValues).default("EUR"),
-    totalAmount: z.coerce.number().nonnegative().optional(),
-    documentStatus: z.enum(invoiceDocumentStatusValues).default("PENDING"),
-    documentVersion: z.coerce.number().int().positive().default(1),
-    documentGeneratedAt: z.coerce.date().nullable().optional(),
-    documentUrl: z.string().min(1).optional(),
-    documentMeta: jsonRecordSchema.optional(),
-    integrationState: jsonRecordSchema.optional(),
-    externalReference: z.string().optional(),
-  });
-
-export const updateInvoiceSchema = createInvoiceSchema.partial();
-
-/**
- * Types
- */
-export type Invoice = z.infer<typeof invoiceSchema>;
-export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
-export type UpdateInvoiceInput = z.infer<typeof updateInvoiceSchema>;
-export type InvoiceLineItem = z.infer<typeof invoiceLineItemSchema>;
-export type PaymentLog = z.infer<typeof paymentLogSchema>;
-export type CreatePaymentLogInput = z.infer<typeof createPaymentLogSchema>;
-export type InvoiceStatus = (typeof invoiceStatusValues)[number];
+export default {};
