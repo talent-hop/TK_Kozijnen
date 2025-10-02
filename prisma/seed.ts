@@ -9,9 +9,23 @@ import {
   ProjectStatus,
 } from "@prisma/client";
 
+import { tkProfileTypeLookup } from "@/modules/catalog/tkAalsmeer";
+
 const prisma = new PrismaClient();
 
+const PROFILE_STOCK_LENGTHS: Record<string, number> = {
+  trend: 6400,
+  cube: 5200,
+  classic: 6000,
+};
+
 async function upsertWindowFrames(projectIds: { aurora: string; cityPark: string }) {
+  const trendProfile = tkProfileTypeLookup["trend"];
+  const cubeProfile = tkProfileTypeLookup["cube"];
+  if (!trendProfile || !cubeProfile) {
+    throw new Error("Missing TK Aalsmeer profile definitions");
+  }
+
   const [livingRoom, office] = await Promise.all([
     prisma.windowFrame.upsert({
       where: { id: "00000000-0000-0000-0000-000000000101" },
@@ -20,6 +34,11 @@ async function upsertWindowFrames(projectIds: { aurora: string; cityPark: string
         costGlazing: new Prisma.Decimal(220),
         costHardware: new Prisma.Decimal(150),
         unitPrice: new Prisma.Decimal(785),
+        materials: {
+          profileType: trendProfile.slug,
+          profileName: trendProfile.name,
+          glazing: "HR++",
+        },
       },
       create: {
         id: "00000000-0000-0000-0000-000000000101",
@@ -29,7 +48,8 @@ async function upsertWindowFrames(projectIds: { aurora: string; cityPark: string
         widthMm: 1200,
         heightMm: 1400,
         materials: {
-          frame: "uPVC Profile A",
+          profileType: trendProfile.slug,
+          profileName: trendProfile.name,
           glazing: "HR++",
         },
         configuration: {
@@ -49,6 +69,11 @@ async function upsertWindowFrames(projectIds: { aurora: string; cityPark: string
         costGlazing: new Prisma.Decimal(190),
         costHardware: new Prisma.Decimal(120),
         unitPrice: new Prisma.Decimal(645),
+        materials: {
+          profileType: cubeProfile.slug,
+          profileName: cubeProfile.name,
+          glazing: "Triple",
+        },
       },
       create: {
         id: "00000000-0000-0000-0000-000000000102",
@@ -58,7 +83,8 @@ async function upsertWindowFrames(projectIds: { aurora: string; cityPark: string
         widthMm: 900,
         heightMm: 1100,
         materials: {
-          frame: "uPVC Profile B",
+          profileType: cubeProfile.slug,
+          profileName: cubeProfile.name,
           glazing: "Triple",
         },
         configuration: {
@@ -336,83 +362,215 @@ async function upsertInvoices(
 }
 
 async function upsertInventoryProfiles() {
-  const [pvc6400, pvc5200, reinforcement] = await Promise.all([
+
+  const trend = tkProfileTypeLookup["trend"];
+
+  const cube = tkProfileTypeLookup["cube"];
+
+  const classic = tkProfileTypeLookup["classic"];
+
+  if (!trend || !cube || !classic) {
+
+    throw new Error("Missing TK Aalsmeer profile definitions");
+
+  }
+
+
+
+  const [trendProfile, cubeProfile, classicProfile, reinforcement] = await Promise.all([
+
     prisma.inventoryProfile.upsert({
-      where: { sku: "PVC-6400-A" },
+
+      where: { sku: "PVC-TREND-6400" },
+
       update: {
-        name: "uPVC Stock Length 6.4m",
-        profileType: "Frame-A",
-        lengthMm: 6400,
+
+        name: `${trend.name} profiel ${PROFILE_STOCK_LENGTHS.trend / 1000} m`,
+
+        profileType: trend.slug,
+
+        lengthMm: PROFILE_STOCK_LENGTHS.trend,
+
         stockQuantity: 24,
+
         scrapAllowanceMm: 35,
-        metadata: { color: "traffic white" },
+
+        metadata: { system: trend.name, minimumStock: 50 },
+
       },
+
       create: {
+
         id: "00000000-0000-0000-0000-000000000701",
-        sku: "PVC-6400-A",
-        name: "uPVC Stock Length 6.4m",
-        profileType: "Frame-A",
-        lengthMm: 6400,
+
+        sku: "PVC-TREND-6400",
+
+        name: `${trend.name} profiel ${PROFILE_STOCK_LENGTHS.trend / 1000} m`,
+
+        profileType: trend.slug,
+
+        lengthMm: PROFILE_STOCK_LENGTHS.trend,
+
         stockQuantity: 24,
+
         scrapAllowanceMm: 35,
-        metadata: { color: "traffic white" },
+
+        metadata: { system: trend.name, minimumStock: 50 },
+
       },
+
     }),
+
     prisma.inventoryProfile.upsert({
-      where: { sku: "PVC-5200-B" },
+
+      where: { sku: "PVC-CUBE-5200" },
+
       update: {
-        name: "uPVC Stock Length 5.2m",
-        profileType: "Frame-B",
-        lengthMm: 5200,
+
+        name: `${cube.name} profiel ${PROFILE_STOCK_LENGTHS.cube / 1000} m`,
+
+        profileType: cube.slug,
+
+        lengthMm: PROFILE_STOCK_LENGTHS.cube,
+
         stockQuantity: 30,
+
         scrapAllowanceMm: 35,
-        metadata: { color: "anthracite" },
+
+        metadata: { system: cube.name, minimumStock: 40 },
+
       },
+
       create: {
+
         id: "00000000-0000-0000-0000-000000000702",
-        sku: "PVC-5200-B",
-        name: "uPVC Stock Length 5.2m",
-        profileType: "Frame-B",
-        lengthMm: 5200,
+
+        sku: "PVC-CUBE-5200",
+
+        name: `${cube.name} profiel ${PROFILE_STOCK_LENGTHS.cube / 1000} m`,
+
+        profileType: cube.slug,
+
+        lengthMm: PROFILE_STOCK_LENGTHS.cube,
+
         stockQuantity: 30,
+
         scrapAllowanceMm: 35,
-        metadata: { color: "anthracite" },
+
+        metadata: { system: cube.name, minimumStock: 40 },
+
       },
+
     }),
+
     prisma.inventoryProfile.upsert({
-      where: { sku: "PVC-3100-H" },
+
+      where: { sku: "PVC-CLASSIC-6000" },
+
       update: {
-        name: "Hardware reinforcement bar 3.1m",
-        profileType: "Reinforcement",
-        lengthMm: 3100,
-        stockQuantity: 48,
-        scrapAllowanceMm: 15,
-        metadata: null,
+
+        name: `${classic.name} profiel ${PROFILE_STOCK_LENGTHS.classic / 1000} m`,
+
+        profileType: classic.slug,
+
+        lengthMm: PROFILE_STOCK_LENGTHS.classic,
+
+        stockQuantity: 18,
+
+        scrapAllowanceMm: 30,
+
+        metadata: { system: classic.name, minimumStock: 24 },
+
       },
+
       create: {
+
         id: "00000000-0000-0000-0000-000000000703",
-        sku: "PVC-3100-H",
-        name: "Hardware reinforcement bar 3.1m",
-        profileType: "Reinforcement",
-        lengthMm: 3100,
-        stockQuantity: 48,
-        scrapAllowanceMm: 15,
-        metadata: null,
+
+        sku: "PVC-CLASSIC-6000",
+
+        name: `${classic.name} profiel ${PROFILE_STOCK_LENGTHS.classic / 1000} m`,
+
+        profileType: classic.slug,
+
+        lengthMm: PROFILE_STOCK_LENGTHS.classic,
+
+        stockQuantity: 18,
+
+        scrapAllowanceMm: 30,
+
+        metadata: { system: classic.name, minimumStock: 24 },
+
       },
+
     }),
+
+    prisma.inventoryProfile.upsert({
+
+      where: { sku: "PVC-3100-REINF" },
+
+      update: {
+
+        name: "Staalversterking 3.1 m",
+
+        profileType: "reinforcement",
+
+        lengthMm: 3100,
+
+        stockQuantity: 48,
+
+        scrapAllowanceMm: 15,
+
+        metadata: null,
+
+      },
+
+      create: {
+
+        id: "00000000-0000-0000-0000-000000000704",
+
+        sku: "PVC-3100-REINF",
+
+        name: "Staalversterking 3.1 m",
+
+        profileType: "reinforcement",
+
+        lengthMm: 3100,
+
+        stockQuantity: 48,
+
+        scrapAllowanceMm: 15,
+
+        metadata: null,
+
+      },
+
+    }),
+
   ]);
 
+
+
   return {
-    pvc6400,
-    pvc5200,
+
+    trend: trendProfile,
+
+    cube: cubeProfile,
+
+    classic: classicProfile,
+
     reinforcement,
+
   };
+
 }
+
+
 
 async function upsertCutPlans(
   projectIds: { aurora: string; cityPark: string },
   walls: { auroraNorth: { id: string }; cityParkWest: { id: string } },
-  inventoryProfiles: { pvc6400: { id: string }; pvc5200: { id: string } },
+  inventoryProfiles: { trend: { id: string }; cube: { id: string } },
 ) {
   const auroraPlan = await prisma.cutPlan.upsert({
     where: { id: "00000000-0000-0000-0000-000000000801" },
@@ -457,8 +615,8 @@ async function upsertCutPlans(
       where: { id: "00000000-0000-0000-0000-000000000901" },
       update: {
         cutPlanId: auroraPlan.id,
-        inventoryProfileId: inventoryProfiles.pvc6400.id,
-        sourceLengthMm: 6400,
+        inventoryProfileId: inventoryProfiles.trend.id,
+        sourceLengthMm: PROFILE_STOCK_LENGTHS.trend,
         usedLengthMm: 5980,
         wasteLengthMm: 420,
         segments: { cuts: [1200, 1200, 1400, 1180, 1200] },
@@ -466,8 +624,8 @@ async function upsertCutPlans(
       create: {
         id: "00000000-0000-0000-0000-000000000901",
         cutPlanId: auroraPlan.id,
-        inventoryProfileId: inventoryProfiles.pvc6400.id,
-        sourceLengthMm: 6400,
+        inventoryProfileId: inventoryProfiles.trend.id,
+        sourceLengthMm: PROFILE_STOCK_LENGTHS.trend,
         usedLengthMm: 5980,
         wasteLengthMm: 420,
         segments: { cuts: [1200, 1200, 1400, 1180, 1200] },
@@ -477,8 +635,8 @@ async function upsertCutPlans(
       where: { id: "00000000-0000-0000-0000-000000000902" },
       update: {
         cutPlanId: auroraPlan.id,
-        inventoryProfileId: inventoryProfiles.pvc5200.id,
-        sourceLengthMm: 5200,
+        inventoryProfileId: inventoryProfiles.cube.id,
+        sourceLengthMm: PROFILE_STOCK_LENGTHS.cube,
         usedLengthMm: 4880,
         wasteLengthMm: 320,
         segments: { cuts: [900, 900, 1100, 980, 1000] },
@@ -486,8 +644,8 @@ async function upsertCutPlans(
       create: {
         id: "00000000-0000-0000-0000-000000000902",
         cutPlanId: auroraPlan.id,
-        inventoryProfileId: inventoryProfiles.pvc5200.id,
-        sourceLengthMm: 5200,
+        inventoryProfileId: inventoryProfiles.cube.id,
+        sourceLengthMm: PROFILE_STOCK_LENGTHS.cube,
         usedLengthMm: 4880,
         wasteLengthMm: 320,
         segments: { cuts: [900, 900, 1100, 980, 1000] },
@@ -569,51 +727,108 @@ async function main() {
 
   await Promise.all([
     prisma.inventoryItem.upsert({
-      where: { sku: "MAT-001" },
+      where: { sku: "MAT-TREND-6400" },
       update: {
         quantity: 120,
         location: "Warehouse 1",
+        notes: "Inbouwdiepte 120 mm; breedte incl. aanslag 81 mm (montage mét stelkozijn)",
       },
       create: {
-        sku: "MAT-001",
-        name: "uPVC Profile A",
-        category: "Frame",
+        sku: "MAT-TREND-6400",
+        name: "Trend profiel 6.4 m",
+        category: "Profielen",
         quantity: 120,
         unit: "lengths",
         location: "Warehouse 1",
         minQuantity: 50,
+        notes: "Inbouwdiepte 120 mm; breedte incl. aanslag 81 mm (montage mét stelkozijn)",
       },
     }),
     prisma.inventoryItem.upsert({
-      where: { sku: "MAT-002" },
+      where: { sku: "MAT-CUBE-5200" },
       update: {
-        quantity: 85,
+        quantity: 96,
+        location: "Warehouse 1",
+        notes: "Inbouwdiepte 120 mm; breedte incl. aanslag 81 mm (montage mét stelkozijn)",
+      },
+      create: {
+        sku: "MAT-CUBE-5200",
+        name: "Cube profiel 5.2 m",
+        category: "Profielen",
+        quantity: 96,
+        unit: "lengths",
+        location: "Warehouse 1",
+        minQuantity: 40,
+        notes: "Inbouwdiepte 120 mm; breedte incl. aanslag 81 mm (montage mét stelkozijn)",
+      },
+    }),
+    prisma.inventoryItem.upsert({
+      where: { sku: "MAT-CLASSIC-6000" },
+      update: {
+        quantity: 54,
+        location: "Warehouse 2",
+        notes: "Inbouwdiepte 76 mm; breedte incl. aanslag 84 mm (montage mét stelkozijn)",
+      },
+      create: {
+        sku: "MAT-CLASSIC-6000",
+        name: "Classic profiel 6.0 m",
+        category: "Profielen",
+        quantity: 54,
+        unit: "lengths",
+        location: "Warehouse 2",
+        minQuantity: 24,
+        notes: "Inbouwdiepte 76 mm; breedte incl. aanslag 84 mm (montage mét stelkozijn)",
+      },
+    }),
+    prisma.inventoryItem.upsert({
+      where: { sku: "MAT-HARDWARE-TILT" },
+      update: {
+        quantity: 90,
         location: "Assembly",
       },
       create: {
-        sku: "MAT-002",
-        name: "Multi-point Lock",
-        category: "Hardware",
-        quantity: 85,
+        sku: "MAT-HARDWARE-TILT",
+        name: "Draai-kiep beslagset",
+        category: "Raam- en deurbeslag",
+        quantity: 90,
         unit: "sets",
         location: "Assembly",
         minQuantity: 40,
+        notes: "Compleet voor Trend en Cube profielen.",
       },
     }),
     prisma.inventoryItem.upsert({
-      where: { sku: "MAT-003" },
+      where: { sku: "MAT-VENT-400" },
       update: {
-        quantity: 48,
-        location: "Glass Storage",
+        quantity: 60,
+        location: "Warehouse 2",
       },
       create: {
-        sku: "MAT-003",
-        name: "HR++ Glass Panel",
-        category: "Glazing",
-        quantity: 48,
-        unit: "panels",
-        location: "Glass Storage",
+        sku: "MAT-VENT-400",
+        name: "Ventilatierooster 400 mm",
+        category: "Ventilatieroosters",
+        quantity: 60,
+        unit: "pieces",
+        location: "Warehouse 2",
         minQuantity: 30,
+        notes: "Voor luchtaanvoer in alle profielseries.",
+      },
+    }),
+    prisma.inventoryItem.upsert({
+      where: { sku: "MAT-HOR-SET" },
+      update: {
+        quantity: 45,
+        location: "Assembly",
+      },
+      create: {
+        sku: "MAT-HOR-SET",
+        name: "Inzethor op maat",
+        category: "Horren",
+        quantity: 45,
+        unit: "sets",
+        location: "Assembly",
+        minQuantity: 20,
+        notes: "Levertijd afgestemd op kozijnkleur.",
       },
     }),
   ]);
@@ -622,7 +837,7 @@ async function main() {
   await upsertCutPlans(
     { aurora: residenceAurora.id, cityPark: cityParkOffices.id },
     { auroraNorth: walls.auroraNorth, cityParkWest: walls.cityParkWest },
-    { pvc6400: inventoryProfiles.pvc6400, pvc5200: inventoryProfiles.pvc5200 },
+    { trend: inventoryProfiles.trend, cube: inventoryProfiles.cube },
   );
 }
 
@@ -634,3 +849,6 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+
+

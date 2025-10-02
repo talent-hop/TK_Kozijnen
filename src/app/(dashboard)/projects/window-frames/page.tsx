@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "@/modules/i18n/LanguageProvider";
 import { ParametricWindowSVG } from "@/modules/window-drawing/ParametricWindowSVG";
+import { tkProfileTypeLookup, tkProfileTypes } from "@/modules/catalog/tkAalsmeer";
 import type { FrameConfig } from "@/modules/window-drawing/types";
 import { validateFrameConfig } from "@/modules/window-drawing/geometry";
 import { fetchJson } from "@/modules/shared/http";
@@ -380,6 +381,47 @@ export default function ProjectWindowFramesPage() {
               </select>
             </div>
 
+            <div>
+              <label className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                {translations.drawings.form.profileType}
+              </label>
+              <select
+                name="profileType"
+                value={form.profileType}
+                onChange={handleInputChange}
+                className="mt-1 w-full rounded-md border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-white focus:border-sky-400 focus:outline-none"
+              >
+                {tkProfileTypes.map((profile) => (
+                  <option key={profile.slug} value={profile.slug}>
+                    {profile.name}
+                  </option>
+                ))}
+              </select>
+              {selectedProfileSpec ? (
+                <div className="mt-2 space-y-2 rounded-md border border-white/10 bg-slate-950/40 p-3 text-xs text-slate-300">
+                  <p>{selectedProfileSpec.description}</p>
+                  {selectedProfileSpec.metrics.length ? (
+                    <dl className="space-y-1">
+                      {selectedProfileSpec.metrics.map((metric) => (
+                        <div key={`${metric.label}-${metric.value}`} className="flex justify-between gap-2">
+                          <dt className="text-slate-400">{metric.label}</dt>
+                          <dd className="font-medium text-slate-200">{metric.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                  <a
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 transition hover:text-sky-200"
+                    href={selectedProfileSpec.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {translations.drawings.form.profileSourceLabel ?? "View TK Aalsmeer spec"}
+                  </a>
+                </div>
+              ) : null}
+            </div>
+
             <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <label className="text-xs uppercase tracking-[0.3em] text-slate-400">
@@ -410,6 +452,47 @@ export default function ProjectWindowFramesPage() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                {translations.drawings.form.profileType}
+              </label>
+              <select
+                name="profileType"
+                value={form.profileType}
+                onChange={handleInputChange}
+                className="mt-1 w-full rounded-md border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-white focus:border-sky-400 focus:outline-none"
+              >
+                {tkProfileTypes.map((profile) => (
+                  <option key={profile.slug} value={profile.slug}>
+                    {profile.name}
+                  </option>
+                ))}
+              </select>
+              {selectedProfileSpec ? (
+                <div className="mt-2 space-y-2 rounded-md border border-white/10 bg-slate-950/40 p-3 text-xs text-slate-300">
+                  <p>{selectedProfileSpec.description}</p>
+                  {selectedProfileSpec.metrics.length ? (
+                    <dl className="space-y-1">
+                      {selectedProfileSpec.metrics.map((metric) => (
+                        <div key={`${metric.label}-${metric.value}`} className="flex justify-between gap-2">
+                          <dt className="text-slate-400">{metric.label}</dt>
+                          <dd className="font-medium text-slate-200">{metric.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                  <a
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 transition hover:text-sky-200"
+                    href={selectedProfileSpec.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {translations.drawings.form.profileSourceLabel ?? "View TK Aalsmeer spec"}
+                  </a>
+                </div>
+              ) : null}
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -493,6 +576,17 @@ export default function ProjectWindowFramesPage() {
                 const drawingConfig = buildDrawingConfig(frame);
                 const isSelected = frame.id === selectedFrameId;
                 const cardClass = `space-y-4 rounded-md border p-4 transition hover:border-sky-300/60 focus:outline-none focus:ring-2 focus:ring-sky-400/60 cursor-pointer ${isSelected ? "border-sky-400/60 bg-slate-900/70" : "border-white/10 bg-slate-900/50"}`;
+                const profileSlug = resolveProfileSlug(frame.materials);
+                const frameProfile = getProfileBySlug(profileSlug);
+                const fallbackProfileName =
+                  typeof frame.materials?.profileName === "string" ? frame.materials.profileName : undefined;
+                const profileDisplayName = frameProfile?.name ?? fallbackProfileName ?? null;
+                const profileLeadMetric = frameProfile?.metrics?.[0];
+                const profileSubtitle = profileDisplayName
+                  ? profileLeadMetric
+                    ? `${profileDisplayName} ? ${profileLeadMetric.label} ${profileLeadMetric.value}`
+                    : profileDisplayName
+                  : null;
                 return (
                   <div
                     key={frame.id}
@@ -514,6 +608,9 @@ export default function ProjectWindowFramesPage() {
                         <p className="text-xs text-slate-400">
                           {frame.widthMm} x {frame.heightMm} mm
                         </p>
+                        {profileSubtitle ? (
+                          <p className="mt-1 text-xs text-slate-300">{profileSubtitle}</p>
+                        ) : null}
                         {frame.notes ? <p className="mt-1 text-xs text-slate-400">{frame.notes}</p> : null}
                       </div>
                       <span className="rounded-full border border-white/10 px-2 py-1 text-[11px] text-slate-200">
@@ -761,7 +858,64 @@ function clampNumber(value: number, min: number, max: number) {
   return value;
 }
 
+function normalizeProfileSlug(input: unknown): string | undefined {
+  if (typeof input !== "string") {
+    return undefined;
+  }
+  const trimmed = input.trim().toLowerCase();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function getProfileBySlug(slug: string | undefined) {
+  if (!slug) {
+    return undefined;
+  }
+  return tkProfileTypeLookup[slug] ?? tkProfileTypeLookup[slug.toLowerCase()];
+}
+
+function resolveProfileSlug(materials: WindowFrameMaterials | null | undefined): string | undefined {
+  if (!materials) {
+    return undefined;
+  }
+
+  const explicitSlug = normalizeProfileSlug(
+    typeof materials.profileType === "string" ? materials.profileType : undefined,
+  );
+  const matchedProfile = getProfileBySlug(explicitSlug);
+  if (matchedProfile) {
+    return matchedProfile.slug;
+  }
+
+  const profileName =
+    typeof materials.profileName === "string" ? materials.profileName.trim().toLowerCase() : undefined;
+  if (profileName) {
+    const byName = tkProfileTypes.find((item) => item.name.toLowerCase() === profileName);
+    if (byName) {
+      return byName.slug;
+    }
+  }
+
+  const legacyCandidate = (materials as Record<string, unknown>).frame;
+  if (typeof legacyCandidate === "string") {
+    const mapped = LEGACY_PROFILE_NAME_MAP[legacyCandidate];
+    if (mapped) {
+      return mapped;
+    }
+  }
+
+  return explicitSlug ?? undefined;
+}
+
 function mapFormToPayload(form: WindowFrameFormState) {
+  const profileSlug = normalizeProfileSlug(form.profileType) ?? undefined;
+  const profile = getProfileBySlug(profileSlug);
+  const materials = profileSlug
+    ? {
+        profileType: profile?.slug ?? profileSlug,
+        ...(profile ? { profileName: profile.name } : {}),
+      }
+    : undefined;
+
   return {
     projectId: form.projectId,
     label: form.label.trim(),
@@ -769,6 +923,7 @@ function mapFormToPayload(form: WindowFrameFormState) {
     widthMm: Number.parseInt(form.widthMm, 10),
     heightMm: Number.parseInt(form.heightMm, 10),
     notes: optionalString(form.notes),
+    ...(materials ? { materials } : {}),
   };
 }
 
